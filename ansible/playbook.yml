@@ -16,9 +16,12 @@
   - geerlingguy.repo-remi
   - geerlingguy.nginx
   - postgres
-  - { role: geerlingguy.ruby,
-      ruby_install_from_source: true,
-      ruby_version: 3.0.0
+  - { role: rvm.ruby,
+      tags: ruby,
+      rvm1_rubies: ['ruby-2.4.2'],
+      rvm1_install_flags: '--auto-dotfiles',
+      rvm1_install_path: /usr/local/rvm,
+      rvm1_user: root
     }
   - app_xpaste
 

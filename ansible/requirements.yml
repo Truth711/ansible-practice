@@ -2,7 +2,7 @@ roles:
 - src: geerlingguy.nginx
 - src: geerlingguy.repo-epel
 - src: geerlingguy.repo-remi
-- src: geerlingguy.ruby
+- src: rvm.ruby
 
 collections:
 - name: community.postgresql
