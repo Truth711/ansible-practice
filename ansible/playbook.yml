@@ -1,0 +1,29 @@
+---
+- name: "App install"
+  become: true
+  hosts: "all"
+  vars:
+    postgres_users_no_log: false
+
+  pre_tasks:
+  - name: Update ca-certificates
+    yum:
+      name: ca-certificates
+      state: latest
+
+  roles:
+  - geerlingguy.repo-epel
+  - geerlingguy.repo-remi
+  - geerlingguy.nginx
+  - postgres
+  - { role: geerlingguy.ruby,
+      ruby_install_from_source: true,
+      ruby_version: 3.0.0
+    }
+  - app_xpaste
+
+  tasks:
+  - name: "Reload nginx"
+    ansible.builtin.service:
+      name: "nginx"
+      state: "reloaded"
