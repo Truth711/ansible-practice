@@ -1,59 +1,140 @@
----
-- name: Install packages
+- name: "Installing epel repo"
+  ansible.builtin.yum:
+    name: "epel-release"
+    state: "present"
+    update_cache: true
+
+- name: "Installing packages"
   ansible.builtin.yum:
     name:
-      - git
-      - "@Development tools"
-      - libxml2-devel
-      - libxslt-devel
-      - nodejs
-      - postgresql-devel
-      - ruby-devel
-    state: present
+       - "libxml2-devel"
+       - "@Development Tools"
+    state: "present"
+    update_cache: true
 
-- name: Get the list of services
-  service_facts:
+- name: "Installing ruby dependencies"
+  ansible.builtin.yum:
+    name:
+      - "openssl"
+      - "openssl-devel"
+      - "readline"
+      - "readline-devel"
+      - "libpqxx-devel"
+      - "libxslt-devel"
+    state: "present"
+    update_cache: true
 
-- name: Stop app_xpaste service
-  systemd:
-    name: app_xpaste
-    state: stopped
-  when: "'app_xpaste.service' in services"
+- name: "Create build directory"
+  file:
+    path: "/tmp/ruby"
+    state: "directory"
 
-- name: Download app_xpaste
-  git:
-    repo: "https://{{ gitlabuser | urlencode }}:{{ gitlabpassword | urlencode }}@gitlab.slurm.io/edu/xpaste_practicum.git"
-    dest: /usr/local/app_xpaste
+- name: "Download ruby"
+  ansible.builtin.get_url:
+    url: "https://cache.ruby-lang.org/pub/ruby/2.6/ruby-2.6.10.tar.gz"
+    dest: "/tmp/ruby/"
+    mode: "0640"
 
-- name: Install app_xpaste
-  shell: |
-    source /etc/profile.d/rvm.sh
-    /usr/local/bin/bundle config build.nokogiri --use-system-libraries
-    /usr/local/bin/bundle install --clean --no-cache --without development --force
-  args:
-    chdir: /usr/local/app_xpaste
+- name: "Extract ruby-2.6.10.tar.gz"
+  ansible.builtin.unarchive:
+    remote_src: yes
+    src: "/tmp/ruby/ruby-2.6.10.tar.gz"
+    dest: "/tmp/ruby"
 
-- name: Create systemd service
-  template:
-    src: app_xpaste.service.j2
-    dest: /lib/systemd/system/app_xpaste.service
+- name: "Configure"
+  command: chdir=/tmp/ruby/ruby-2.6.10 creates=/tmp/ruby/ruby-2.6.10/Makefile ./configure
 
-- name: Start app_xpaste service
-  systemd:
-    name: app_xpaste
-    state: started
-    enabled: true
-    daemon_reload: true
+- name: "Build the default target"
+  make:
+    chdir: "/tmp/ruby/ruby-2.6.10"
 
-- name: Copy nginx configuration
-  copy: remote_src=True src=/usr/local/app_xpaste/config/nginx.conf dest=/etc/nginx/nginx.conf
+- name: "Run install target"
+  make:
+    chdir: "/tmp/ruby/ruby-2.6.10"
+    target: install
+  become: yes
 
-- name: Copy robots.txt
-  copy: remote_src=True src=/usr/local/app_xpaste/public/robots.txt dest=/usr/local/app_xpaste/app/assets/robots.txt
+- name: "Delete build directory"
+  file:
+    path: "/tmp/ruby"
+    state: "absent"
 
-- name: "Update nginx configuration"
+- name: "Create /app directory"
+  file:
+    path: "/app"
+    owner: nginx
+    group: nginx
+    state: "directory"
+
+- name: "Clone repository"
+  ansible.builtin.git:
+    repo: "https://{{gitlabuser|urlencode()}}:{{gitlabpassword|urlencode()}}@gitlab.slurm.io/edu/xpaste_practicum.git"
+    dest: "/app"
+    force: yes
+  become: yes
+  become_user: nginx
+
+- name: "Uncomment therubyracer"
   ansible.builtin.replace:
-    path: "/etc/nginx/nginx.conf"
-    regexp: '/app/public'
-    replace: '/usr/local/app_xpaste/app/assets'
-    validate: nginx -c %s -t
+    path: "/app/Gemfile"
+    regexp: "# gem 'therubyracer'"
+    replace: "gem 'therubyracer'"
+
+- name: "Modify socket path"
+  ansible.builtin.replace:
+    path: "/app/config/nginx.conf"
+    regexp: "/var/run/puma.sock"
+    replace: "/var/lib/xpaste/puma.sock"
+
+- name: "Replace nginx.conf"
+  copy:
+    remote_src: yes
+    src: "/app/config/nginx.conf"
+    dest: "/etc/nginx/nginx.conf"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: "Build app: bundle config"
+  shell:
+    cmd: /usr/local/bin/bundle config build.nokogiri --use-system-libraries
+  become: yes
+#  become_user: nginx
+  args:
+    chdir: "/app"
+
+- name: "Build app: bundle install"
+  shell:
+    cmd: "/usr/local/bin/bundle install --clean --force --no-cache --without development"
+  become: yes
+  args:
+    chdir: "/app"
+
+- name: "Copy service file"
+  ansible.builtin.template:
+    src: "templates/app_xpaste.service.j2"
+    dest: "/etc/systemd/system/app_xpaste.service"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: "Create socket dir"
+  file:
+    path: "/var/lib/{{ APP_NAME }}"
+    owner: nginx
+    group: nginx
+    state: "directory"
+
+- name: "Start service"
+  ansible.builtin.systemd:
+    state: restarted
+    daemon_reload: true
+    name: "{{ APP_NAME }}"
+    enabled: true
+
+- name: "Restart nginx"
+  ansible.builtin.systemd:
+    state: restarted
+    daemon_reload: true
+    name: nginx
+    enabled: true

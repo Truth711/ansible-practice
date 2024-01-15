@@ -27,26 +27,26 @@
 
 - name: "Create a new database"
   community.postgresql.postgresql_db:
-    name: xpastedb
+    name: "{{ DB_NAME }}"
   become: true
   become_user: postgres
 
-- name: "Connect to xpastedb, create xpasteuser"
+- name: "Connect to db, create user"
   community.postgresql.postgresql_user:
-    db: xpastedb
-    name: xpasteuser
-    password: xpastepassword
+    db: "{{ DB_NAME }}"
+    name: "{{ DB_USER }}"
+    password: "{{ DB_PASSWORD }}"
     priv: "ALL"
   become: true
   become_user: postgres
 
-- name: "Allow password connection for xpasteuser"
+- name: "Allow password connection for user"
   community.postgresql.postgresql_pg_hba:
     dest: "/var/lib/pgsql/data/pg_hba.conf"
     contype: host
     databases: all
     method: password
-    users: "xpasteuser"
+    users: "{{ DB_USER }}"
     create: true
   become: true
   become_user: postgres

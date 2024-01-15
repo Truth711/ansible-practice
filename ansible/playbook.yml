@@ -1,32 +1,20 @@
 ---
-- name: "App install"
+- name: "Application deployment"
+  hosts: "server"
   become: true
-  hosts: "all"
-  vars:
-    postgres_users_no_log: false
-
-  pre_tasks:
-  - name: Update ca-certificates
-    yum:
-      name: ca-certificates
-      state: latest
-
+  vars_files:
+    - defaults/main.yml
   roles:
-  - geerlingguy.repo-epel
-  - geerlingguy.repo-remi
-  - geerlingguy.nginx
-  - postgres
-  - { role: rvm.ruby,
-      tags: ruby,
-      rvm1_rubies: ['ruby-2.4.2'],
-      rvm1_install_flags: '--auto-dotfiles',
-      rvm1_install_path: /usr/local/rvm,
-      rvm1_user: root
-    }
-  - app_xpaste
+   - { role: geerlingguy.nginx }
+   - postgres
+   - app_xpaste
 
   tasks:
   - name: "Reload nginx"
     ansible.builtin.service:
       name: "nginx"
       state: "reloaded"
+
+  - name: "Print app url"
+    ansible.builtin.debug:
+      msg: "{{ APP_NAME }} available at: http://{{ ansible_ssh_host }}"
