@@ -28,7 +28,6 @@
 - name: "Create a new database"
   community.postgresql.postgresql_db:
     name: "{{ DB_NAME }}"
-  become: true
   become_user: postgres
 
 - name: "Connect to db, create user"
@@ -37,7 +36,6 @@
     name: "{{ DB_USER }}"
     password: "{{ DB_PASSWORD }}"
     priv: "ALL"
-  become: true
   become_user: postgres
 
 - name: "Allow password connection for user"
@@ -48,7 +46,6 @@
     method: password
     users: "{{ DB_USER }}"
     create: true
-  become: true
   become_user: postgres
 
 - name: "Restart service"

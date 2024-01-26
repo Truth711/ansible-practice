@@ -2,7 +2,6 @@
   ansible.builtin.yum:
     name: "epel-release"
     state: "present"
-    update_cache: true
 
 - name: "Installing packages"
   ansible.builtin.yum:
@@ -10,7 +9,6 @@
        - "libxml2-devel"
        - "@Development Tools"
     state: "present"
-    update_cache: true
 
 - name: "Installing ruby dependencies"
   ansible.builtin.yum:
@@ -52,7 +50,6 @@
   make:
     chdir: "/tmp/ruby/ruby-2.6.10"
     target: install
-  become: yes
 
 - name: "Delete build directory"
   file:
@@ -71,7 +68,6 @@
     repo: "https://{{gitlabuser|urlencode()}}:{{gitlabpassword|urlencode()}}@gitlab.slurm.io/edu/xpaste_practicum.git"
     dest: "/app"
     force: yes
-  become: yes
   become_user: nginx
 
 - name: "Uncomment therubyracer"
@@ -98,22 +94,19 @@
 - name: "Build app: bundle config"
   shell:
     cmd: /usr/local/bin/bundle config build.nokogiri --use-system-libraries
-  become: yes
-#  become_user: nginx
   args:
     chdir: "/app"
 
 - name: "Build app: bundle install"
   shell:
     cmd: "/usr/local/bin/bundle install --clean --force --no-cache --without development"
-  become: yes
   args:
     chdir: "/app"
 
 - name: "Copy service file"
   ansible.builtin.template:
     src: "templates/app_xpaste.service.j2"
-    dest: "/etc/systemd/system/xpaste.service"
+    dest: "/etc/systemd/system/{{ APP_NAME }}.service"
     owner: root
     group: root
     mode: 0644

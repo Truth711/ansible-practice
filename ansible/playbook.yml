@@ -1,7 +1,6 @@
 ---
 - name: "Application deployment"
   hosts: "server"
-  become: true
   vars_files:
     - defaults/main.yml
   roles:
